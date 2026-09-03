@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>สั่งเครื่องดื่ม - ตัวอย่าง LIFF</title>
+
+<!-- LIFF SDK -->
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    background: #f7f5f2;
+    margin: 0;
+    padding: 16px;
+    color: #2b2b2b;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  #status { font-size: 13px; color: #888; margin-bottom: 16px; }
+
+  .menu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .menu-item .name { font-weight: 600; }
+  .menu-item .price { color: #b23b3b; font-size: 14px; }
+  .qty-control { display: flex; align-items: center; gap: 8px; }
+  .qty-control button {
+    width: 30px; height: 30px; border-radius: 50%; border: none;
+    background: #b23b3b; color: #fff; font-size: 16px; cursor: pointer;
+  }
+  .qty-control span { min-width: 18px; text-align: center; }
+
+  #summary {
+    position: sticky; bottom: 0;
+    background: #b23b3b; color: #fff;
+    padding: 14px 18px; border-radius: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 20px; cursor: pointer; border: none; width: 100%;
+    font-size: 16px; font-weight: 600;
+  }
+  #summary:disabled { opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<h1>NaiBaaN Cafe' (ตัวอย่าง)</h1>
+<div id="status">กำลังโหลด...</div>
+
+<div id="menu"></div>
+
+<button id="summary" disabled onclick="submitOrder()">
+  <span id="summary-text">เลือกเมนูก่อน</span>
+</button>
+
+<script>
+  // ===== ตั้งค่าตรงนี้ =====
+  const LIFF_ID = "YOUR_LIFF_ID_HERE"; // จาก LINE Developers Console
+  const APPS_SCRIPT_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE"; // จาก Google Apps Script deploy
+
+  // เมนูตัวอย่าง (จริงๆ ควรดึงจาก Sheet ผ่าน Apps Script ด้วย GET แทนการ hardcode)
+  const MENU = [
+    { id: "esp",   name: "เอสเปรสโซ่", price: 40 },
+    { id: "latte", name: "ลาเต้",       price: 40 },
+    { id: "som",   name: "กาแฟส้ม",     price: 45 },
+  ];
+
+  let cart = {}; // { id: qty }
+  let userId = null;
+  let displayName = null;
+
+  async function init() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      const profile = await liff.getProfile();
+      userId = profile.userId;
+      displayName = profile.displayName;
+      document.getElementById("status").innerText = "สวัสดีคุณ " + displayName;
+      renderMenu();
+    } catch (err) {
+      document.getElementById("status").innerText = "เปิดผิดพลาด: " + err.message;
+    }
+  }
+
+  function renderMenu() {
+    const menuEl = document.getElementById("menu");
+    menuEl.innerHTML = "";
+    MENU.forEach(item => {
+      cart[item.id] = cart[item.id] || 0;
+      const div = document.createElement("div");
+      div.className = "menu-item";
+      div.innerHTML = `
+        <div>
+          <div class="name">${item.name}</div>
+          <div class="price">${item.price} บาท</div>
+        </div>
+        <div class="qty-control">
+          <button onclick="changeQty('${item.id}', -1)">−</button>
+          <span id="qty-${item.id}">${cart[item.id]}</span>
+          <button onclick="changeQty('${item.id}', 1)">+</button>
+        </div>
+      `;
+      menuEl.appendChild(div);
+    });
+  }
+
+  function changeQty(id, delta) {
+    cart[id] = Math.max(0, (cart[id] || 0) + delta);
+    document.getElementById(`qty-${id}`).innerText = cart[id];
+    updateSummary();
+  }
+
+  function updateSummary() {
+    const items = MENU.filter(m => cart[m.id] > 0);
+    const total = items.reduce((sum, m) => sum + m.price * cart[m.id], 0);
+    const btn = document.getElementById("summary");
+    const text = document.getElementById("summary-text");
+    if (items.length === 0) {
+      btn.disabled = true;
+      text.innerText = "เลือกเมนูก่อน";
+    } else {
+      btn.disabled = false;
+      text.innerText = `สั่งเลย • รวม ${total} บาท`;
+    }
+  }
+
+  async function submitOrder() {
+    const items = MENU
+      .filter(m => cart[m.id] > 0)
+      .map(m => ({ name: m.name, qty: cart[m.id], price: m.price }));
+    const total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
+
+    const payload = {
+      userId: userId,
+      displayName: displayName,
+      items: items,
+      total: total,
+      timestamp: new Date().toISOString(),
+    };
+
+    document.getElementById("summary-text").innerText = "กำลังส่งออเดอร์...";
+
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" }, // ใช้ text/plain กัน CORS preflight ปัญหากับ Apps Script
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.result === "success") {
+        document.getElementById("status").innerText = "สั่งซื้อสำเร็จ! ขอบคุณครับ 🎉";
+        cart = {};
+        renderMenu();
+        updateSummary();
+      } else {
+        throw new Error(data.message || "ไม่ทราบสาเหตุ");
+      }
+    } catch (err) {
+      document.getElementById("summary-text").innerText = "ผิดพลาด ลองใหม่อีกครั้ง";
+      console.error(err);
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
