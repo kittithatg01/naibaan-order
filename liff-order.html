@@ -3,174 +3,528 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>สั่งเครื่องดื่ม - ตัวอย่าง LIFF</title>
-
-<!-- LIFF SDK -->
+<title>NaiBaaN Cafe' - สั่งเครื่องดื่ม</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
 <style>
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif;
     background: #f7f5f2;
-    margin: 0;
-    padding: 16px;
     color: #2b2b2b;
   }
-  h1 { font-size: 20px; margin-bottom: 4px; }
-  #status { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .hidden { display: none !important; }
 
-  .menu-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #fff;
-    border-radius: 12px;
-    padding: 12px 16px;
-    margin-bottom: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  /* ===== Top bar ===== */
+  .topbar {
+    background: #fff; padding: 14px 16px; border-bottom: 1px solid #eee;
+    position: sticky; top: 0; z-index: 20;
+    display: flex; justify-content: space-between; align-items: center;
   }
-  .menu-item .name { font-weight: 600; }
-  .menu-item .price { color: #b23b3b; font-size: 14px; }
+  .topbar h1 { font-size: 16px; }
+  .topbar .sub { font-size: 11px; color: #888; margin-top: 2px; }
+  .cart-icon-btn {
+    position: relative; width: 40px; height: 40px; border-radius: 50%;
+    background: #f7f5f2; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+  }
+  .cart-icon-btn .badge {
+    position: absolute; top: -2px; right: -2px; background: #b23b3b; color: #fff;
+    font-size: 10px; border-radius: 8px; padding: 1px 5px; min-width: 16px; text-align: center;
+  }
+
+  .screen { padding: 14px 16px 24px; }
+
+  /* ===== Search ===== */
+  .search-box {
+    width: 100%; padding: 11px 14px; border-radius: 10px; border: 1px solid #ddd;
+    font-size: 14px; margin-bottom: 12px; background: #fff;
+  }
+
+  /* ===== Category tabs ===== */
+  .tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 4px; }
+  .tab {
+    flex-shrink: 0; padding: 7px 14px; border-radius: 20px;
+    background: #fff; border: 1px solid #ddd; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .tab.active { background: #b23b3b; color: #fff; border-color: #b23b3b; }
+
+  /* ===== Product grid ===== */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card {
+    background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  }
+  .card .thumb {
+    height: 110px; display: flex; align-items: center; justify-content: center;
+    font-size: 42px; background: linear-gradient(135deg, #f3e2d8, #e9cfc0);
+  }
+  .card .info { padding: 10px 12px 12px; }
+  .card .name { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .card .cat { font-size: 11px; color: #999; margin: 2px 0 4px; }
+  .card .price { font-size: 14px; font-weight: 700; color: #b23b3b; margin-bottom: 8px; }
+  .card .btn-row { display: flex; gap: 6px; }
+  .card button {
+    flex: 1; padding: 7px 0; border-radius: 8px; border: none; font-size: 12px; cursor: pointer;
+  }
+  .card .add-btn { background: #b23b3b; color: #fff; font-weight: 700; }
+  .card .qty-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #b23b3b; border-radius: 8px; padding: 2px;
+  }
+  .card .qty-row button { background: transparent; color: #fff; font-size: 16px; width: 26px; }
+  .card .qty-row span { color: #fff; font-weight: 700; font-size: 13px; }
+
+  .no-result { text-align: center; color: #999; font-size: 13px; margin-top: 30px; grid-column: 1 / -1; }
+
+  /* ===== Cart / Checkout screen ===== */
+  .cart-line {
+    background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .cart-line .name { font-size: 14px; font-weight: 600; }
+  .cart-line .unit { font-size: 12px; color: #888; }
   .qty-control { display: flex; align-items: center; gap: 8px; }
   .qty-control button {
-    width: 30px; height: 30px; border-radius: 50%; border: none;
-    background: #b23b3b; color: #fff; font-size: 16px; cursor: pointer;
+    width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: #b23b3b; color: #fff; font-size: 14px; cursor: pointer;
   }
-  .qty-control span { min-width: 18px; text-align: center; }
+  .empty-note { text-align: center; color: #999; font-size: 13px; margin-top: 40px; }
 
-  #summary {
-    position: sticky; bottom: 0;
-    background: #b23b3b; color: #fff;
-    padding: 14px 18px; border-radius: 14px;
-    display: flex; justify-content: space-between; align-items: center;
-    margin-top: 20px; cursor: pointer; border: none; width: 100%;
-    font-size: 16px; font-weight: 600;
+  .section-title { font-size: 15px; font-weight: 700; margin: 16px 0 10px; }
+  .field-label { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  .field-box, select.field-box, textarea.field-box {
+    width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid #ddd;
+    font-size: 14px; background: #fff; font-family: inherit;
   }
-  #summary:disabled { opacity: 0.5; }
+  .pill-group { display: flex; gap: 8px; }
+  .pill { flex: 1; text-align: center; padding: 10px; border-radius: 10px; border: 1px solid #ddd; background: #fff; font-size: 13px; cursor: pointer; }
+  .pill.active { border-color: #b23b3b; background: #fdeeee; color: #b23b3b; font-weight: 600; }
+
+  .slot-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .slot { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border: 1px solid #ddd; border-radius: 10px; cursor: pointer; }
+  .slot.active { border-color: #b23b3b; background: #fdeeee; }
+  .slot .time { font-weight: 600; font-size: 14px; }
+  .slot .remain { font-size: 12px; color: #888; }
+  .slot.full { opacity: 0.4; pointer-events: none; }
+
+  .discount-row { display: flex; gap: 8px; margin-top: 6px; }
+  .discount-row .field-box { flex: 1; }
+  .discount-row button { padding: 0 16px; border-radius: 10px; border: none; background: #2b2b2b; color: #fff; font-size: 13px; cursor: pointer; }
+  .discount-msg { font-size: 12px; margin-top: 6px; }
+  .discount-msg.ok { color: #2a8f4f; }
+  .discount-msg.err { color: #c0392b; }
+
+  .summary-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #555; }
+  .summary-row.total { font-size: 16px; font-weight: 700; color: #2b2b2b; border-top: 1px solid #eee; margin-top: 6px; padding-top: 10px; }
+
+  .primary-btn {
+    width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: #b23b3b; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 18px;
+  }
+  .primary-btn:disabled { opacity: 0.45; }
+  .back-link { font-size: 13px; color: #b23b3b; cursor: pointer; display: inline-block; margin-bottom: 8px; }
+
+  #toast {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    background: #2b2b2b; color: #fff; padding: 10px 18px; border-radius: 20px;
+    font-size: 13px; z-index: 100; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 
-<h1>NaiBaaN Cafe' (ตัวอย่าง)</h1>
-<div id="status">กำลังโหลด...</div>
+<div class="topbar">
+  <div>
+    <h1>NaiBaaN Cafe' 🏠</h1>
+    <div class="sub" id="greeting">กำลังโหลด...</div>
+  </div>
+  <div class="cart-icon-btn" onclick="goToScreen('cart')">
+    🛒
+    <span class="badge hidden" id="cart-badge">0</span>
+  </div>
+</div>
 
-<div id="menu"></div>
+<!-- ===================== MENU SCREEN ===================== -->
+<div class="screen" id="screen-menu">
+  <input class="search-box" id="search-input" placeholder="ค้นหาเมนู..." oninput="renderMenu()" />
+  <div class="tabs" id="category-tabs"></div>
+  <div class="grid" id="menu-grid"></div>
+</div>
 
-<button id="summary" disabled onclick="submitOrder()">
-  <span id="summary-text">เลือกเมนูก่อน</span>
-</button>
+<!-- ===================== CART / CHECKOUT SCREEN ===================== -->
+<div class="screen hidden" id="screen-cart">
+  <div class="back-link" onclick="goToScreen('menu')">‹ กลับไปเลือกเมนูต่อ</div>
+  <div class="section-title">ตะกร้าของคุณ</div>
+  <div id="cart-lines"></div>
+  <div class="empty-note hidden" id="cart-empty">ยังไม่มีสินค้าในตะกร้า</div>
+
+  <div id="checkout-fields" class="hidden">
+    <div class="field-label">รูปแบบรับสินค้า</div>
+    <div class="pill-group">
+      <div class="pill active" id="pill-delivery" onclick="setDeliveryType('delivery')">🛵 ส่งเดลิเวอรี</div>
+      <div class="pill" id="pill-pickup" onclick="setDeliveryType('pickup')">🏠 รับหน้าร้าน</div>
+    </div>
+
+    <div class="field-label">วันที่รับสินค้า</div>
+    <div class="tabs" id="date-tabs"></div>
+
+    <div class="field-label">รอบเวลา</div>
+    <div class="slot-list" id="slot-list"></div>
+
+    <div id="address-field">
+      <div class="field-label">ที่อยู่จัดส่ง</div>
+      <select class="field-box" id="address-select">
+        <option>โรงพยาบาลสุขสำราญ</option>
+        <option>เทศบาลเมือง</option>
+        <option>สถานีตำรวจ</option>
+        <option>อื่นๆ (ระบุด้านล่าง)</option>
+      </select>
+      <textarea class="field-box" id="address-detail" placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)" style="margin-top:8px; min-height:44px;"></textarea>
+    </div>
+
+    <div class="field-label">เบอร์โทร</div>
+    <input class="field-box" id="phone-input" placeholder="เบอร์โทรติดต่อกลับ" />
+
+    <div class="field-label">โค้ดส่วนลด</div>
+    <div class="discount-row">
+      <input class="field-box" id="discount-input" placeholder="กรอกโค้ดส่วนลด (ถ้ามี)" />
+      <button onclick="applyDiscount()">ใช้โค้ด</button>
+    </div>
+    <div class="discount-msg" id="discount-msg"></div>
+
+    <div class="field-label">ฝากถึงร้าน</div>
+    <textarea class="field-box" id="note-input" placeholder="ไม่บังคับ" style="min-height:44px;"></textarea>
+
+    <div class="section-title">สรุปรายการ</div>
+    <div class="summary-row"><span>ยอดรวมสินค้า</span><span id="sum-subtotal">0 บาท</span></div>
+    <div class="summary-row" id="sum-discount-row" style="display:none;"><span>ส่วนลด</span><span id="sum-discount">-0 บาท</span></div>
+    <div class="summary-row total"><span>รวมทั้งหมด</span><span id="sum-total">0 บาท</span></div>
+
+    <button class="primary-btn" id="confirm-btn" onclick="submitOrder()">ยืนยันสั่งซื้อ</button>
+  </div>
+</div>
+
+<div id="toast"></div>
 
 <script>
-  // ===== ตั้งค่าตรงนี้ =====
-  const LIFF_ID = "YOUR_LIFF_ID_HERE"; // จาก LINE Developers Console
-  const APPS_SCRIPT_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE"; // จาก Google Apps Script deploy
+  const LIFF_ID = "YOUR_LIFF_ID_HERE";
+  const APPS_SCRIPT_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
-  // เมนูตัวอย่าง (จริงๆ ควรดึงจาก Sheet ผ่าน Apps Script ด้วย GET แทนการ hardcode)
+  // ตัวอย่างเมนู — thumb ใช้ emoji แทนรูปจริงไปก่อน ทีหลังเปลี่ยนเป็น <img src="..."> ได้
   const MENU = [
-    { id: "esp",   name: "เอสเปรสโซ่", price: 40 },
-    { id: "latte", name: "ลาเต้",       price: 40 },
-    { id: "som",   name: "กาแฟส้ม",     price: 45 },
+    { id: "esp",   name: "เอสเปรสโซ่",      price: 40, category: "กาแฟ", thumb: "☕" },
+    { id: "latte", name: "ลาเต้",            price: 40, category: "กาแฟ", thumb: "☕" },
+    { id: "som",   name: "กาแฟส้ม",          price: 45, category: "กาแฟ", thumb: "🍊" },
+    { id: "honey", name: "กาแฟน้ำผึ้งมะนาว", price: 45, category: "กาแฟ", thumb: "🍯" },
+    { id: "cap",   name: "คาปูชิโน่",         price: 40, category: "กาแฟ", thumb: "☕" },
+    { id: "coco",  name: "กาแฟมะพร้าว",       price: 45, category: "กาแฟ", thumb: "🥥" },
+    { id: "mocha", name: "มอคค่า",            price: 45, category: "กาแฟ", thumb: "🍫" },
+    { id: "thaite",name: "ชาไทย",            price: 40, category: "ชา",   thumb: "🧋" },
+    { id: "green", name: "ชาเขียว",          price: 40, category: "ชา",   thumb: "🍵" },
+    { id: "choc",  name: "ช็อกโกแลต",        price: 45, category: "อื่นๆ", thumb: "🍫" },
+    { id: "milk",  name: "นมสด",             price: 35, category: "นม",  thumb: "🥛" },
+    { id: "pink",  name: "นมชมพู",           price: 35, category: "นม",  thumb: "🍓" },
   ];
 
-  let cart = {}; // { id: qty }
+  const DISCOUNTS = { "NAIBAAN10": 10, "WELCOME20": 20 };
+
+  let cart = {};
   let userId = null;
   let displayName = null;
+  let selectedDate = null;
+  let selectedSlot = null;
+  let deliveryType = "delivery";
+  let discountApplied = 0;
+  let discountCodeUsed = "";
+
+  const SLOT_CAPACITY = { "09:00": 30, "13:00": 25, "17:00": 20 };
 
   async function init() {
     try {
       await liff.init({ liffId: LIFF_ID });
-      if (!liff.isLoggedIn()) {
-        liff.login();
-        return;
-      }
+      if (!liff.isLoggedIn()) { liff.login(); return; }
       const profile = await liff.getProfile();
       userId = profile.userId;
       displayName = profile.displayName;
-      document.getElementById("status").innerText = "สวัสดีคุณ " + displayName;
-      renderMenu();
+      document.getElementById("greeting").innerText = "สวัสดีคุณ " + displayName;
     } catch (err) {
-      document.getElementById("status").innerText = "เปิดผิดพลาด: " + err.message;
+      document.getElementById("greeting").innerText = "เปิดผิดพลาด: " + err.message;
     }
+    renderCategoryTabs();
+    renderMenu();
+    renderDateTabs();
+    updateCartBadge();
+  }
+
+  function goToScreen(name) {
+    document.getElementById("screen-menu").classList.toggle("hidden", name !== "menu");
+    document.getElementById("screen-cart").classList.toggle("hidden", name !== "cart");
+    if (name === "cart") renderCartScreen();
+  }
+
+  // ---------- Menu grid ----------
+  function renderCategoryTabs() {
+    const cats = ["ทั้งหมด", ...new Set(MENU.map(m => m.category))];
+    const el = document.getElementById("category-tabs");
+    el.innerHTML = cats.map(c =>
+      `<div class="tab ${c === "ทั้งหมด" ? "active" : ""}" data-cat="${c}" onclick="selectCategory('${c}', this)">${c}</div>`
+    ).join("");
+  }
+
+  function selectCategory(cat, tabEl) {
+    document.querySelectorAll("#category-tabs .tab").forEach(t => t.classList.remove("active"));
+    tabEl.classList.add("active");
+    renderMenu();
+  }
+
+  function currentCategory() {
+    const active = document.querySelector("#category-tabs .tab.active");
+    return active ? active.dataset.cat : "ทั้งหมด";
   }
 
   function renderMenu() {
-    const menuEl = document.getElementById("menu");
-    menuEl.innerHTML = "";
-    MENU.forEach(item => {
-      cart[item.id] = cart[item.id] || 0;
-      const div = document.createElement("div");
-      div.className = "menu-item";
-      div.innerHTML = `
-        <div>
-          <div class="name">${item.name}</div>
-          <div class="price">${item.price} บาท</div>
-        </div>
-        <div class="qty-control">
-          <button onclick="changeQty('${item.id}', -1)">−</button>
-          <span id="qty-${item.id}">${cart[item.id]}</span>
-          <button onclick="changeQty('${item.id}', 1)">+</button>
-        </div>
-      `;
-      menuEl.appendChild(div);
-    });
+    const cat = currentCategory();
+    const keyword = document.getElementById("search-input").value.trim().toLowerCase();
+    let items = cat === "ทั้งหมด" ? MENU : MENU.filter(m => m.category === cat);
+    if (keyword) items = items.filter(m => m.name.toLowerCase().includes(keyword));
+
+    const el = document.getElementById("menu-grid");
+    if (items.length === 0) {
+      el.innerHTML = `<div class="no-result">ไม่พบเมนูที่ค้นหา</div>`;
+      return;
+    }
+
+    el.innerHTML = items.map(item => {
+      const qty = cart[item.id] || 0;
+      return `
+        <div class="card">
+          <div class="thumb">${item.thumb}</div>
+          <div class="info">
+            <div class="name">${item.name}</div>
+            <div class="cat">${item.category}</div>
+            <div class="price">${item.price} บาท</div>
+            ${qty === 0
+              ? `<div class="btn-row"><button class="add-btn" onclick="changeQty('${item.id}', 1)">+ เพิ่มตะกร้า</button></div>`
+              : `<div class="qty-row">
+                   <button onclick="changeQty('${item.id}', -1)">−</button>
+                   <span>${qty}</span>
+                   <button onclick="changeQty('${item.id}', 1)">+</button>
+                 </div>`
+            }
+          </div>
+        </div>`;
+    }).join("");
   }
 
   function changeQty(id, delta) {
     cart[id] = Math.max(0, (cart[id] || 0) + delta);
-    document.getElementById(`qty-${id}`).innerText = cart[id];
+    if (cart[id] === 0) delete cart[id];
+    renderMenu();
+    updateCartBadge();
+  }
+
+  function totalQty() { return Object.values(cart).reduce((a, b) => a + b, 0); }
+
+  function cartItemsDetailed() {
+    return Object.entries(cart).map(([id, qty]) => {
+      const m = MENU.find(x => x.id === id);
+      return { id, name: m.name, price: m.price, qty };
+    });
+  }
+
+  function subtotal() { return cartItemsDetailed().reduce((sum, i) => sum + i.price * i.qty, 0); }
+
+  function updateCartBadge() {
+    const qty = totalQty();
+    const badge = document.getElementById("cart-badge");
+    badge.classList.toggle("hidden", qty === 0);
+    badge.innerText = qty;
+  }
+
+  // ---------- Cart / checkout screen ----------
+  function renderCartScreen() {
+    const items = cartItemsDetailed();
+    const linesEl = document.getElementById("cart-lines");
+    const emptyEl = document.getElementById("cart-empty");
+    const fieldsEl = document.getElementById("checkout-fields");
+
+    if (items.length === 0) {
+      linesEl.innerHTML = "";
+      emptyEl.classList.remove("hidden");
+      fieldsEl.classList.add("hidden");
+      return;
+    }
+    emptyEl.classList.add("hidden");
+    fieldsEl.classList.remove("hidden");
+
+    linesEl.innerHTML = items.map(i => `
+      <div class="cart-line">
+        <div>
+          <div class="name">${i.name}</div>
+          <div class="unit">${i.price} บาท x ${i.qty}</div>
+        </div>
+        <div class="qty-control">
+          <button onclick="changeQty('${i.id}', -1); renderCartScreen();">−</button>
+          <span>${i.qty}</span>
+          <button onclick="changeQty('${i.id}', 1); renderCartScreen();">+</button>
+        </div>
+      </div>
+    `).join("");
+
+    if (!selectedDate) renderDateTabs();
+    renderSlots();
+    updateSummary();
+  }
+
+  function renderDateTabs() {
+    const days = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+    const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+    const el = document.getElementById("date-tabs");
+    el.innerHTML = "";
+    for (let i = 0; i < 4; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const label = i === 0 ? "วันนี้" : `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`;
+      if (i === 0) selectedDate = selectedDate || key;
+      const tab = document.createElement("div");
+      tab.className = "tab" + (selectedDate === key ? " active" : "");
+      tab.innerText = label;
+      tab.onclick = () => { selectedDate = key; selectedSlot = null; renderDateTabs(); renderSlots(); updateSummary(); };
+      el.appendChild(tab);
+    }
+  }
+
+  function renderSlots() {
+    const el = document.getElementById("slot-list");
+    const times = Object.keys(SLOT_CAPACITY);
+    el.innerHTML = times.map(t => {
+      const remain = SLOT_CAPACITY[t] - (selectedDate.charCodeAt(9) % 8);
+      const full = remain <= 0;
+      return `
+        <div class="slot ${selectedSlot === t ? "active" : ""} ${full ? "full" : ""}" onclick="selectSlot('${t}')">
+          <div>
+            <div class="time">${t} น.</div>
+            <div class="remain">${full ? "เต็มแล้ว" : "เหลือ " + remain + " แก้ว"}</div>
+          </div>
+          <div>${selectedSlot === t ? "✓" : ""}</div>
+        </div>`;
+    }).join("");
+  }
+
+  function selectSlot(t) { selectedSlot = t; renderSlots(); validateConfirmButton(); }
+
+  function setDeliveryType(type) {
+    deliveryType = type;
+    document.getElementById("pill-delivery").classList.toggle("active", type === "delivery");
+    document.getElementById("pill-pickup").classList.toggle("active", type === "pickup");
+    document.getElementById("address-field").classList.toggle("hidden", type === "pickup");
+  }
+
+  function applyDiscount() {
+    const code = document.getElementById("discount-input").value.trim().toUpperCase();
+    const msgEl = document.getElementById("discount-msg");
+    if (DISCOUNTS[code]) {
+      discountApplied = DISCOUNTS[code];
+      discountCodeUsed = code;
+      msgEl.textContent = `ใช้โค้ดสำเร็จ ลด ${discountApplied} บาท`;
+      msgEl.className = "discount-msg ok";
+    } else {
+      discountApplied = 0;
+      discountCodeUsed = "";
+      msgEl.textContent = "โค้ดไม่ถูกต้องหรือหมดอายุ";
+      msgEl.className = "discount-msg err";
+    }
     updateSummary();
   }
 
   function updateSummary() {
-    const items = MENU.filter(m => cart[m.id] > 0);
-    const total = items.reduce((sum, m) => sum + m.price * cart[m.id], 0);
-    const btn = document.getElementById("summary");
-    const text = document.getElementById("summary-text");
-    if (items.length === 0) {
-      btn.disabled = true;
-      text.innerText = "เลือกเมนูก่อน";
+    const sub = subtotal();
+    const total = Math.max(0, sub - discountApplied);
+    document.getElementById("sum-subtotal").innerText = sub + " บาท";
+    const discRow = document.getElementById("sum-discount-row");
+    if (discountApplied > 0) {
+      discRow.style.display = "flex";
+      document.getElementById("sum-discount").innerText = "-" + discountApplied + " บาท";
     } else {
-      btn.disabled = false;
-      text.innerText = `สั่งเลย • รวม ${total} บาท`;
+      discRow.style.display = "none";
     }
+    document.getElementById("sum-total").innerText = total + " บาท";
+    validateConfirmButton();
   }
 
-  async function submitOrder() {
-    const items = MENU
-      .filter(m => cart[m.id] > 0)
-      .map(m => ({ name: m.name, qty: cart[m.id], price: m.price }));
-    const total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
+  function validateConfirmButton() {
+    const btn = document.getElementById("confirm-btn");
+    const phoneOk = document.getElementById("phone-input").value.trim().length >= 9;
+    btn.disabled = !(totalQty() > 0 && selectedSlot && phoneOk);
+  }
+  document.addEventListener("input", (e) => {
+    if (e.target.id === "phone-input") validateConfirmButton();
+  });
 
+  async function submitOrder() {
+    const items = cartItemsDetailed();
+    const total = Math.max(0, subtotal() - discountApplied);
     const payload = {
-      userId: userId,
-      displayName: displayName,
-      items: items,
-      total: total,
+      action: "order",
+      userId, displayName,
+      items: items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+      subtotal: subtotal(),
+      discount: discountApplied,
+      discountCode: discountCodeUsed,
+      total,
+      deliveryType,
+      deliveryDate: selectedDate,
+      deliveryTime: selectedSlot,
+      address: deliveryType === "delivery"
+        ? document.getElementById("address-select").value + " " + document.getElementById("address-detail").value
+        : "รับเองที่ร้าน",
+      phone: document.getElementById("phone-input").value.trim(),
+      note: document.getElementById("note-input").value.trim(),
       timestamp: new Date().toISOString(),
     };
 
-    document.getElementById("summary-text").innerText = "กำลังส่งออเดอร์...";
+    const btn = document.getElementById("confirm-btn");
+    btn.disabled = true;
+    btn.innerText = "กำลังส่งออเดอร์...";
 
     try {
       const res = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
-        headers: { "Content-Type": "text/plain" }, // ใช้ text/plain กัน CORS preflight ปัญหากับ Apps Script
+        headers: { "Content-Type": "text/plain" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.result === "success") {
-        document.getElementById("status").innerText = "สั่งซื้อสำเร็จ! ขอบคุณครับ 🎉";
+        showToast("สั่งซื้อสำเร็จ! ขอบคุณค่ะ 🎉");
         cart = {};
+        discountApplied = 0; discountCodeUsed = "";
+        document.getElementById("discount-input").value = "";
+        document.getElementById("discount-msg").textContent = "";
+        document.getElementById("phone-input").value = "";
+        document.getElementById("note-input").value = "";
+        updateCartBadge();
+        goToScreen("menu");
         renderMenu();
-        updateSummary();
       } else {
         throw new Error(data.message || "ไม่ทราบสาเหตุ");
       }
     } catch (err) {
-      document.getElementById("summary-text").innerText = "ผิดพลาด ลองใหม่อีกครั้ง";
+      showToast("ผิดพลาด ลองใหม่อีกครั้ง");
       console.error(err);
+    } finally {
+      btn.innerText = "ยืนยันสั่งซื้อ";
+      validateConfirmButton();
     }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.innerText = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2500);
   }
 
   init();
