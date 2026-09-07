@@ -137,7 +137,6 @@
   </div>
 </div>
 
-<!-- ===================== MENU SCREEN ===================== -->
 <div class="screen" id="screen-menu">
   <input class="search-box" id="search-input" placeholder="ค้นหาเมนู..." oninput="renderMenu()" />
   <div class="tabs" id="category-tabs"></div>
@@ -146,7 +145,6 @@
   </div>
 </div>
 
-<!-- ===================== CART / CHECKOUT SCREEN ===================== -->
 <div class="screen hidden" id="screen-cart">
   <div class="back-link" onclick="goToScreen('menu')">‹ กลับไปเลือกเมนูต่อ</div>
   <div class="section-title">ตะกร้าของคุณ</div>
@@ -199,9 +197,10 @@
 
 <script>
   const LIFF_ID = "2011409300-iEvaxdgT";
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYQ72SwTUsqhEQ_S3LdHjbA4FfvX_8Wdq0yYGmHnrhKQMoLETqKK8caTRgRiwDOgo2Bg/exec";
+  // แก้ตรงนี้เป็น URL ของ Cloudflare Worker (ไม่ใช่ URL ของ Apps Script โดยตรงแล้ว)
+  const APPS_SCRIPT_URL = "https://naibaan-proxy.sitthinam88.workers.dev/";
 
-  let MENU = []; // ดึงจาก Google Sheet ผ่าน Apps Script
+  let MENU = [];
   let cart = {};
   let userId = null;
   let displayName = null;
@@ -213,30 +212,6 @@
 
   const SLOT_CAPACITY = { "09:00": 30, "13:00": 25, "17:00": 20 };
 
-  // เรียก Apps Script ผ่าน JSONP แทน fetch() ธรรมดา เพื่อเลี่ยงปัญหา CORS
-  // ที่เกิดกับ Google Apps Script เวลาถูกเรียกข้ามโดเมนจากเว็บอื่น (เช่น GitHub Pages)
-  function callAppsScript(params) {
-    return new Promise((resolve, reject) => {
-      const callbackName = "jsonp_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
-      const query = new URLSearchParams({ ...params, callback: callbackName }).toString();
-
-      window[callbackName] = (data) => {
-        resolve(data);
-        delete window[callbackName];
-        script.remove();
-      };
-
-      const script = document.createElement("script");
-      script.src = `${APPS_SCRIPT_URL}?${query}`;
-      script.onerror = () => {
-        reject(new Error("เชื่อมต่อ Apps Script ไม่สำเร็จ"));
-        delete window[callbackName];
-        script.remove();
-      };
-      document.body.appendChild(script);
-    });
-  }
-
   async function init() {
     try {
       await liff.init({ liffId: LIFF_ID });
@@ -245,10 +220,6 @@
       userId = profile.userId;
       displayName = profile.displayName;
       document.getElementById("greeting").innerText = "สวัสดีคุณ " + displayName;
-
-      // ชั่วคราว: ใช้ตอนตั้งค่าระบบครั้งแรกเพื่อหา LINE User ID ของเจ้าของร้าน
-      // เอา // ด้านหน้าออกเพื่อเปิดใช้ แล้วใส่ // กลับก่อนให้ลูกค้าคนอื่นใช้งานจริง
-      // alert("My userId: " + userId);
     } catch (err) {
       document.getElementById("greeting").innerText = "เปิดผิดพลาด: " + err.message;
     }
@@ -259,7 +230,8 @@
 
   async function loadMenuFromServer() {
     try {
-      const data = await callAppsScript({ action: "menu" });
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=menu`);
+      const data = await res.json();
       if (data.result !== "success") throw new Error(data.message);
       MENU = data.menu.map(m => ({ ...m, price: Number(m.price) }));
       renderCategoryTabs();
@@ -452,7 +424,6 @@
     );
   }
 
-  // ---------- โค้ดส่วนลด: เช็คสดกับ Google Sheet พร้อมโควตาต่อคน ----------
   async function applyDiscount() {
     const code = document.getElementById("discount-input").value.trim();
     const msgEl = document.getElementById("discount-msg");
@@ -464,7 +435,8 @@
     msgEl.className = "discount-msg";
 
     try {
-      const data = await callAppsScript({ action: "discount", code: code, userId: userId });
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=discount&code=${encodeURIComponent(code)}&userId=${encodeURIComponent(userId)}`);
+      const data = await res.json();
 
       if (data.result !== "success") {
         discountApplied = 0; discountCodeUsed = "";
@@ -519,7 +491,7 @@
       userId, displayName,
       items: items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
       subtotal: subtotal(),
-      discountCode: discountCodeUsed, // ฝั่ง server จะคำนวณส่วนลดจริงและตัดโควตาให้เอง (รวม+ต่อคน)
+      discountCode: discountCodeUsed,
       deliveryType,
       deliveryDate: selectedDate,
       deliveryTime: selectedSlot,
@@ -536,7 +508,12 @@
     btn.innerText = "กำลังส่งออเดอร์...";
 
     try {
-      const data = await callAppsScript({ action: "order", payload: JSON.stringify(payload) });
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
       if (data.result === "success") {
         showToast(`สั่งซื้อสำเร็จ! ยอดรวม ${data.finalTotal} บาท 🎉`);
         cart = {};
