@@ -161,13 +161,14 @@
     <div class="field-label">วันที่รับสินค้า</div>
     <div class="tabs" id="date-tabs"></div>
 
-    <div class="field-label">รอบเวลา</div>
-    <div class="slot-list" id="slot-list"></div>
+    <div class="field-label">เวลาที่ต้องการรับสินค้า (รับได้ถึง 21:00 น.)</div>
+    <input class="field-box" type="time" id="time-input" max="21:00" onchange="onTimeChange()" />
+    <div class="discount-msg err hidden" id="time-error">กรุณาเลือกเวลาก่อน 21:00 น.</div>
 
     <div id="address-field">
       <div class="field-label">ที่อยู่จัดส่ง</div>
-      <textarea class="field-box" id="address-detail" placeholder="พิมพ์ที่อยู่ หรือกดปุ่มด้านล่างเพื่อแนบตำแหน่งปัจจุบัน" style="min-height:60px;"></textarea>
-      <div class="location-btn" onclick="shareLocation()">📍 แชร์ตำแหน่งปัจจุบัน</div>
+      <textarea class="field-box" id="address-detail" placeholder="พิมพ์ที่อยู่ที่นี่" style="min-height:60px;"></textarea>
+      <div class="location-btn" onclick="shareLocation()">📍 ระบุตำแหน่ง</div>
     </div>
 
     <div class="field-label">เบอร์โทร</div>
@@ -205,12 +206,12 @@
   let userId = null;
   let displayName = null;
   let selectedDate = null;
-  let selectedSlot = null;
+  let selectedTime = null;
   let deliveryType = "delivery";
   let discountApplied = 0;
   let discountCodeUsed = "";
 
-  const SLOT_CAPACITY = { "09:00": 30, "13:00": 25, "17:00": 20 };
+  const LATEST_ORDER_TIME = "21:00";
 
   async function init() {
     try {
@@ -359,7 +360,6 @@
     `).join("");
 
     if (!selectedDate) renderDateTabs();
-    renderSlots();
     updateSummary();
   }
 
@@ -377,29 +377,25 @@
       const tab = document.createElement("div");
       tab.className = "tab" + (selectedDate === key ? " active" : "");
       tab.innerText = label;
-      tab.onclick = () => { selectedDate = key; selectedSlot = null; renderDateTabs(); renderSlots(); updateSummary(); };
+      tab.onclick = () => { selectedDate = key; renderDateTabs(); updateSummary(); };
       el.appendChild(tab);
     }
   }
 
-  function renderSlots() {
-    const el = document.getElementById("slot-list");
-    const times = Object.keys(SLOT_CAPACITY);
-    el.innerHTML = times.map(t => {
-      const remain = SLOT_CAPACITY[t] - (selectedDate.charCodeAt(9) % 8);
-      const full = remain <= 0;
-      return `
-        <div class="slot ${selectedSlot === t ? "active" : ""} ${full ? "full" : ""}" onclick="selectSlot('${t}')">
-          <div>
-            <div class="time">${t} น.</div>
-            <div class="remain">${full ? "เต็มแล้ว" : "เหลือ " + remain + " แก้ว"}</div>
-          </div>
-          <div>${selectedSlot === t ? "✓" : ""}</div>
-        </div>`;
-    }).join("");
-  }
+  function onTimeChange() {
+    const val = document.getElementById("time-input").value; // "HH:MM"
+    const errEl = document.getElementById("time-error");
+    if (!val) { selectedTime = null; validateConfirmButton(); return; }
 
-  function selectSlot(t) { selectedSlot = t; renderSlots(); validateConfirmButton(); }
+    if (val > LATEST_ORDER_TIME) {
+      selectedTime = null;
+      errEl.classList.remove("hidden");
+    } else {
+      selectedTime = val;
+      errEl.classList.add("hidden");
+    }
+    validateConfirmButton();
+  }
 
   function setDeliveryType(type) {
     deliveryType = type;
@@ -478,7 +474,7 @@
   function validateConfirmButton() {
     const btn = document.getElementById("confirm-btn");
     const phoneOk = document.getElementById("phone-input").value.trim().length >= 9;
-    btn.disabled = !(totalQty() > 0 && selectedSlot && phoneOk);
+    btn.disabled = !(totalQty() > 0 && selectedTime && phoneOk);
   }
   document.addEventListener("input", (e) => {
     if (e.target.id === "phone-input") validateConfirmButton();
@@ -494,7 +490,7 @@
       discountCode: discountCodeUsed,
       deliveryType,
       deliveryDate: selectedDate,
-      deliveryTime: selectedSlot,
+      deliveryTime: selectedTime,
       address: deliveryType === "delivery"
         ? document.getElementById("address-detail").value.trim()
         : "รับเองที่ร้าน",
@@ -523,6 +519,8 @@
         document.getElementById("phone-input").value = "";
         document.getElementById("note-input").value = "";
         document.getElementById("address-detail").value = "";
+        document.getElementById("time-input").value = "";
+        selectedTime = null;
         updateCartBadge();
         goToScreen("menu");
         renderMenu();
